@@ -186,3 +186,87 @@ public static DataTable ExecuteQuery(string query, NpgsqlParameter[] parameters 
     
     return dataTable;
 }
+private void LoadEmployeeFilter()
+{
+    string query = "SELECT EmployeeID, FullName FROM Employees ORDER BY FullName";
+    var dt = DatabaseHelper.ExecuteQuery(query);
+    
+    // Создаем новую таблицу с опцией "Все сотрудники"
+    DataTable filterDt = new DataTable();
+    filterDt.Columns.Add("EmployeeID", typeof(int));
+    filterDt.Columns.Add("FullName", typeof(string));
+    
+    // Добавляем "Все сотрудники" (EmployeeID = 0)
+    DataRow allRow = filterDt.NewRow();
+    allRow["EmployeeID"] = 0;
+    allRow["FullName"] = "Все сотрудники";
+    filterDt.Rows.Add(allRow);
+    
+    // Добавляем всех сотрудников
+    foreach (DataRow row in dt.Rows)
+    {
+        DataRow newRow = filterDt.NewRow();
+        newRow["EmployeeID"] = Convert.ToInt32(row["EmployeeID"]);
+        newRow["FullName"] = row["FullName"].ToString();
+        filterDt.Rows.Add(newRow);
+    }
+    
+    cmbEmployeeFilter.DataSource = filterDt;
+    cmbEmployeeFilter.DisplayMember = "FullName";
+    cmbEmployeeFilter.ValueMember = "EmployeeID";
+}
+private void BtnGenerateReport_Click(object sender, EventArgs e)
+{
+    int selectedValue = Convert.ToInt32(cmbEmployeeFilter.SelectedValue);
+    
+    string query;
+    NpgsqlParameter[] parameters;
+    
+    if (selectedValue == 0) // Все сотрудники
+    {
+        query = @"
+            SELECT 
+                e.FullName AS ""Сотрудник"",
+                COALESCE(SUM(ap.Amount), 0) AS ""Выдано всего"",
+                COALESCE(SUM(CASE WHEN ap.IsTaxable = TRUE THEN ap.Amount ELSE 0 END), 0) AS ""Сумма, облагаемая налогом"",
+                COALESCE(SUM(CASE WHEN ap.IsTaxable = TRUE THEN ap.Amount * 0.13 ELSE 0 END), 0) AS ""Сумма налога (13%)""
+            FROM Employees e
+            LEFT JOIN AdvancePayments ap ON e.EmployeeID = ap.EmployeeID 
+                AND ap.PaymentDate BETWEEN @startDate AND @endDate
+            GROUP BY e.EmployeeID, e.FullName
+            ORDER BY e.FullName";
+        
+        parameters = new[]
+        {
+            new NpgsqlParameter("@startDate", dtpStartDate.Value),
+            new NpgsqlParameter("@endDate", dtpEndDate.Value)
+        };
+    }
+    else // Конкретный сотрудник
+    {
+        query = @"
+            SELECT 
+                e.FullName AS ""Сотрудник"",
+                COALESCE(SUM(ap.Amount), 0) AS ""Выдано всего"",
+                COALESCE(SUM(CASE WHEN ap.IsTaxable = TRUE THEN ap.Amount ELSE 0 END), 0) AS ""Сумма, облагаемая налогом"",
+                COALESCE(SUM(CASE WHEN ap.IsTaxable = TRUE THEN ap.Amount * 0.13 ELSE 0 END), 0) AS ""Сумма налога (13%)""
+            FROM Employees e
+            LEFT JOIN AdvancePayments ap ON e.EmployeeID = ap.EmployeeID 
+                AND ap.PaymentDate BETWEEN @startDate AND @endDate
+            WHERE e.EmployeeID = @empId
+            GROUP BY e.EmployeeID, e.FullName
+            ORDER BY e.FullName";
+        
+        parameters = new[]
+        {
+            new NpgsqlParameter("@startDate", dtpStartDate.Value),
+            new NpgsqlParameter("@endDate", dtpEndDate.Value),
+            new NpgsqlParameter("@empId", selectedValue)
+        };
+    }
+
+    var dgvTaxReport = tabControl.TabPages[2].Controls["dgvTaxReport"] as DataGridView;
+    dgvTaxReport.DataSource = DatabaseHelper.ExecuteQuery(query, parameters);
+    dgvTaxReport.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+}
+
