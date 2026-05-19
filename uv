@@ -330,4 +330,149 @@ private void InitializeComponent()
     
     this.Controls.AddRange(new Control[] { lblDate, dtpDate, lblAmount, txtAmount, chkTaxable, btnOK, btnCancel });
 }
+using System;
+using System.Windows.Forms;
 
+namespace AccountingApp
+{
+    public partial class AdvancePaymentForm : Form
+    {
+        public DateTime PaymentDate { get; set; }
+        public decimal Amount { get; set; }
+        public bool IsTaxable { get; set; }
+        
+        private DateTimePicker dtpDate;
+        private TextBox txtAmount;
+        private CheckBox chkTaxable;
+        private Button btnOK, btnCancel;
+        private int employeeId;
+        
+        public AdvancePaymentForm(int empId)
+        {
+            employeeId = empId;
+            InitializeComponent();
+        }
+        
+        private void InitializeComponent()
+        {
+            this.Text = "Выдача подотчетных средств";
+            this.Size = new System.Drawing.Size(400, 220);
+            this.StartPosition = FormStartPosition.CenterParent;
+            this.FormBorderStyle = FormBorderStyle.FixedDialog;
+            this.MaximizeBox = false;
+            
+            // Дата выплаты
+            Label lblDate = new Label 
+            { 
+                Text = "Дата выплаты:", 
+                Location = new System.Drawing.Point(20, 20), 
+                Size = new System.Drawing.Size(100, 25) 
+            };
+            
+            dtpDate = new DateTimePicker 
+            { 
+                Location = new System.Drawing.Point(130, 20), 
+                Size = new System.Drawing.Size(200, 25), 
+                Format = DateTimePickerFormat.Short,
+                MaxDate = DateTime.Today  // Нельзя выбрать будущую дату
+            };
+            
+            // Сумма
+            Label lblAmount = new Label 
+            { 
+                Text = "Сумма (руб.):", 
+                Location = new System.Drawing.Point(20, 60), 
+                Size = new System.Drawing.Size(100, 25) 
+            };
+            
+            txtAmount = new TextBox 
+            { 
+                Location = new System.Drawing.Point(130, 60), 
+                Size = new System.Drawing.Size(200, 25) 
+            };
+            
+            // Чекбокс облагается налогом
+            chkTaxable = new CheckBox 
+            { 
+                Text = "Облагается налогом (отчет был до получения)", 
+                Location = new System.Drawing.Point(20, 100), 
+                Size = new System.Drawing.Size(350, 25) 
+            };
+            
+            // Кнопки
+            btnOK = new Button 
+            { 
+                Text = "OK", 
+                Location = new System.Drawing.Point(180, 140), 
+                Size = new System.Drawing.Size(80, 30), 
+                DialogResult = DialogResult.OK 
+            };
+            
+            btnCancel = new Button 
+            { 
+                Text = "Отмена", 
+                Location = new System.Drawing.Point(270, 140), 
+                Size = new System.Drawing.Size(80, 30), 
+                DialogResult = DialogResult.Cancel 
+            };
+            
+            // Обработчик кнопки OK
+            btnOK.Click += (s, e) => {
+                // Проверка суммы
+                if (!decimal.TryParse(txtAmount.Text, out decimal amount) || amount <= 0)
+                {
+                    MessageBox.Show("Введите корректную сумму (больше 0)!", "Ошибка", 
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    this.DialogResult = DialogResult.None;
+                    return;
+                }
+                
+                // Проверка даты (дополнительная защита)
+                if (dtpDate.Value > DateTime.Today)
+                {
+                    MessageBox.Show("Дата выплаты не может быть позже сегодняшнего дня!", "Ошибка", 
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    this.DialogResult = DialogResult.None;
+                    return;
+                }
+                
+                PaymentDate = dtpDate.Value;
+                Amount = amount;
+                IsTaxable = chkTaxable.Checked;
+            };
+            
+            this.Controls.AddRange(new Control[] { 
+                lblDate, dtpDate, 
+                lblAmount, txtAmount, 
+                chkTaxable, 
+                btnOK, btnCancel 
+            });
+        }
+        
+        protected override void OnLoad(EventArgs e)
+        {
+            base.OnLoad(e);
+            
+            // Устанавливаем значения при загрузке формы
+            txtAmount.Text = Amount > 0 ? Amount.ToString() : "";
+            
+            // ВАЖНО: Проверяем, что PaymentDate не равен DateTime.MinValue
+            if (PaymentDate == DateTime.MinValue || PaymentDate < dtpDate.MinDate)
+            {
+                // Если дата не задана или слишком старая, ставим сегодняшнюю
+                dtpDate.Value = DateTime.Today;
+            }
+            else if (PaymentDate > dtpDate.MaxDate)
+            {
+                // Если дата будущая (что не должно случиться), ставим сегодняшнюю
+                dtpDate.Value = DateTime.Today;
+            }
+            else
+            {
+                dtpDate.Value = PaymentDate;
+            }
+            
+            chkTaxable.Checked = IsTaxable;
+        }
+    }
+}
