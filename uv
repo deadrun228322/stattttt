@@ -137,3 +137,52 @@ private void LoadEmployeeFilter()
     cmbEmployeeFilter.DisplayMember = "FullName";
     cmbEmployeeFilter.ValueMember = "EmployeeID";
 }
+public static DataTable ExecuteQuery(string query, NpgsqlParameter[] parameters = null)
+{
+    DataTable dataTable = new DataTable();
+    
+    try
+    {
+        using (var connection = GetConnection())
+        {
+            connection.Open();
+            
+            using (var command = new NpgsqlCommand(query, connection))
+            {
+                // Добавляем параметры, если они есть
+                if (parameters != null && parameters.Length > 0)
+                {
+                    foreach (var param in parameters)
+                    {
+                        // Важно: явно указываем тип данных для параметров
+                        if (param.Value == null || param.Value == DBNull.Value)
+                        {
+                            param.Value = DBNull.Value;
+                            param.NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Integer; // Для ID
+                        }
+                        command.Parameters.Add(param);
+                    }
+                }
+                
+                using (var reader = command.ExecuteReader())
+                {
+                    dataTable.Load(reader);
+                }
+            }
+        }
+    }
+    catch (NpgsqlException ex)
+    {
+        MessageBox.Show($"Ошибка базы данных: {ex.Message}\nЗапрос: {query}", 
+            "Ошибка SQL", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        throw;
+    }
+    catch (Exception ex)
+    {
+        MessageBox.Show($"Ошибка выполнения запроса: {ex.Message}", 
+            "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        throw;
+    }
+    
+    return dataTable;
+}
