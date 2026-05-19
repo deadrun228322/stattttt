@@ -269,4 +269,65 @@ private void BtnGenerateReport_Click(object sender, EventArgs e)
     dgvTaxReport.DataSource = DatabaseHelper.ExecuteQuery(query, parameters);
     dgvTaxReport.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
 }
+private void LoadExpenseReports()
+{
+    var dgvReports = tabControl.TabPages[1].Controls["dgvReports"] as DataGridView;
+    string query = @"
+        SELECT 
+            e.FullName AS ""Сотрудник"",
+            COALESCE(SUM(rd.Amount), 0) AS ""Сумма расходов"",
+            COUNT(DISTINCT r.ReportID) AS ""Количество отчетов""
+        FROM Employees e
+        LEFT JOIN ExpenseReports r ON e.EmployeeID = r.EmployeeID
+        LEFT JOIN ReportDetails rd ON r.ReportID = rd.ReportID
+        GROUP BY e.EmployeeID, e.FullName
+        ORDER BY e.FullName";
+    
+    dgvReports.DataSource = DatabaseHelper.ExecuteQuery(query);
+    dgvReports.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+}
+private void InitializeComponent()
+{
+    this.Text = "Выдача подотчетных средств";
+    this.Size = new System.Drawing.Size(400, 200);
+    this.StartPosition = FormStartPosition.CenterParent;
+    
+    Label lblDate = new Label { Text = "Дата выплаты:", Location = new System.Drawing.Point(20, 20), Size = new System.Drawing.Size(100, 25) };
+    dtpDate = new DateTimePicker { Location = new System.Drawing.Point(130, 20), Size = new System.Drawing.Size(200, 25), Format = DateTimePickerFormat.Short };
+    
+    // === ДОБАВЬТЕ ЭТИ ДВЕ СТРОКИ ===
+    dtpDate.MaxDate = DateTime.Today;  // Нельзя выбрать дату позже сегодня
+    dtpDate.Value = DateTime.Today;     // Значение по умолчанию - сегодня
+    
+    Label lblAmount = new Label { Text = "Сумма:", Location = new System.Drawing.Point(20, 60), Size = new System.Drawing.Size(100, 25) };
+    txtAmount = new TextBox { Location = new System.Drawing.Point(130, 60), Size = new System.Drawing.Size(200, 25) };
+    
+    chkTaxable = new CheckBox { Text = "Облагается налогом (был отчет до получения)", Location = new System.Drawing.Point(20, 100), Size = new System.Drawing.Size(300, 25) };
+    
+    btnOK = new Button { Text = "OK", Location = new System.Drawing.Point(180, 140), Size = new System.Drawing.Size(80, 30), DialogResult = DialogResult.OK };
+    btnCancel = new Button { Text = "Отмена", Location = new System.Drawing.Point(270, 140), Size = new System.Drawing.Size(80, 30), DialogResult = DialogResult.Cancel };
+    
+    btnOK.Click += (s, e) => {
+        if (!decimal.TryParse(txtAmount.Text, out decimal amount) || amount <= 0)
+        {
+            MessageBox.Show("Введите корректную сумму!", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            this.DialogResult = DialogResult.None;
+            return;
+        }
+        
+        // === ДОБАВЬТЕ ПРОВЕРКУ ДАТЫ ===
+        if (dtpDate.Value > DateTime.Today)
+        {
+            MessageBox.Show("Дата выплаты не может быть позже сегодняшнего дня!", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            this.DialogResult = DialogResult.None;
+            return;
+        }
+        
+        PaymentDate = dtpDate.Value;
+        Amount = amount;
+        IsTaxable = chkTaxable.Checked;
+    };
+    
+    this.Controls.AddRange(new Control[] { lblDate, dtpDate, lblAmount, txtAmount, chkTaxable, btnOK, btnCancel });
+}
 
